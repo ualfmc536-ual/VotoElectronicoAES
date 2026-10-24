@@ -5,12 +5,13 @@ Created on 24/10/2026
 from random import Random
 from pathlib import Path
 
+# Variables globales
 generador = Random()
-p = 13
-num_votantes = 0
-nº_candidatos = 2
-conjuntos_codificacion: list[list[int]] = []
-
+p = 13                  # Número primo para el módulo
+num_votantes = 0        # Número de votantes
+nº_candidatos = 2       # Número de candidatos
+conjuntos_codificacion: list[list[int]] = []   # Listas de codificación para cada candidato
+índices_restantes = []  # Lista de índices de votantes que aún no han votado
 
 def iniciar_censo():
     CARPETA_DATOS = Path(__file__).resolve().parent / "Documentos"
@@ -27,8 +28,6 @@ def iniciar_censo():
 
 
 def iniciar_urna():
-    print("Número de votantes: ", num_votantes)
-    print("Número primo: ", p)
     with open("urna.txt", "w") as archivo:
         for i in range(num_votantes):
             archivo.write(str(generador.randint(0, 100)%p) + " \t")
@@ -40,6 +39,7 @@ def iniciar_urna():
 
 def iniciar_conjuntos_codificacion():
     global conjuntos_codificacion
+    conjuntos_codificacion.clear()
     lista_candidatos = []
     for i in range(nº_candidatos):
         lista_candidatos.append("Candidato " + str(i + 1))
@@ -63,6 +63,41 @@ def iniciar_conjuntos_codificacion():
             archivo.write("\n")
 
 
+def realizar_voto_manual():
+    global índices_restantes
+    index = generador.choice(índices_restantes)
+
+    print("Indice del votante: ", index)
+    polinomio = generar_polinomio(p + 1)
+    print("Polinomio generado: ", end="")
+    for i in range(len(polinomio)):
+        print(polinomio[i], end="")
+        if i < len(polinomio) - 1:
+            print("x^" + str(i) + " + ", end="")
+    print("\n")
+    print("Ingrese el valor del polinomio en el índice del votante: ")
+    valor = int(input())
+    with open("urna.txt", "r+") as archivo:
+        lineas = archivo.readlines()
+        lineas[1] = lineas[1].strip() + str(valor) + " \t"
+        archivo.seek(0)
+        archivo.writelines(lineas)   
+
+    índices_restantes.remove(index)
+
+
+def generar_polinomio(grado: int) -> list[int]:
+    if grado < 0:
+        raise ValueError("El grado debe ser mayor o igual que 0")
+
+    # Coeficientes desde el término independiente hasta x^(grado - 1).
+    coeficientes = [generador.randrange(p) for _ in range(grado)]
+
+    # El coeficiente principal no puede ser 0 si queremos ese grado exacto.
+    coeficientes.append(generador.randrange(1, p))
+
+    return coeficientes
+
 
 def main(): 
     censo_iniciado = False
@@ -78,6 +113,7 @@ def main():
 
         if opcion == "1":
             urna_iniciada = False  # Reiniciar el estado de la urna al iniciar un nuevo censo
+            print("Iniciando censo electoral...")
             iniciar_censo()
             print("Censo electoral iniciado correctamente.")
             censo_iniciado = True
@@ -86,18 +122,46 @@ def main():
             if not censo_iniciado:
                 print("Primero debe iniciar el censo electoral.")
             else:
+                print("Iniciando urna...")
                 iniciar_urna()
                 print("Urna iniciada correctamente.")
                 urna_iniciada = True
 
-        if opcion == "3":
+        elif opcion == "3":
             if not urna_iniciada:
                 print("Primero debe iniciar la urna.")
             else:
                 iniciar_conjuntos_codificacion()
                 print("Conjuntos de codificación iniciados correctamente.")
 
+        elif opcion == "4":
+            if not urna_iniciada:
+                print("Primero debe iniciar la urna.")
+            else:
+                global índices_restantes
+                índices_restantes = list(range(num_votantes))
+                while índices_restantes:
+                    print("1.Iniciar proceso de voto manual")
+                    print("2.Iniciar proceso de voto automático")
+                    opcion_voto = input("Seleccione una opción: ")
+                    if opcion_voto == "1":
+                        realizar_voto_manual()
+                        print("Proceso de voto manual terminado correctamente.")
+
+                    elif opcion_voto == "2":
+                        realizar_voto_automatico()
+                        print("Proceso de voto automático terminado correctamente.")
+
+                    else:
+                        print("Opción de voto no válida. Por favor, seleccione 1 o 2.")
+                    index = generador.randint(0, num_votantes - 1)
+
+                    # Aquí se implementaría la lógica del proceso de voto
+                    # Por ahora, solo mostramos un mensaje
+                    print("Proceso de voto iniciado correctamente.")
+                    
+        else:
+            print("Opción no válida. Por favor, seleccione una opción del 1 al 4.")
 
 if __name__ == "__main__":  
     main()
-    
