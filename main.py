@@ -196,7 +196,7 @@ def generar_polinomio(grado: int) -> list[int]:
 
 def realizar_recuento():
     with open("urna.txt", "r", encoding="utf-8") as archivo:
-
+        archivo.write("wekala")
 
 def main(): 
     censo_iniciado = False
