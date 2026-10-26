@@ -36,6 +36,16 @@ def verificar_voto(id_votante: int) -> bool:
     return False
 
 
+def obtener_votantes_pendientes() -> list[int]:
+    """Devuelve los IDs del censo que todavía no tienen un índice asignado."""
+    with open("censo.txt", "r", encoding="utf-8") as archivo:
+        return [
+            int(campos[0])
+            for linea in archivo
+            if (campos := linea.split()) and len(campos) == 1
+        ]
+
+
 def actualizar_censo(id_votante: int, index: int) -> None:
     """Guarda el índice de urna asignado junto al ID del votante."""
     with open("censo.txt", "r", encoding="utf-8") as archivo:
@@ -276,7 +286,7 @@ def main():
         print("2. Iniciar algoritmo SKGA")
         print("3. Iniciar conjuntos de codificación")
         print("4. Iniciar algoritmo de recolección y proceso de voto")
-        print("5. Iniciar algoritmo de recolección y recuento de votos")
+        print("5. Iniciar algoritmo de recuento y recuento de votos")
         print("6. Salir")
         opcion = input("Seleccione una opción: ")
 
@@ -307,6 +317,8 @@ def main():
         elif opcion == "4":
             if not urna_iniciada:
                 print("Primero debe iniciar la urna.")
+            elif not obtener_votantes_pendientes():
+                print("No quedan votantes pendientes.")
             else:
                 algoritmo_recoleccion = alg_recoleccion()
                 algoritmo_recoleccion.presentar_menu()
@@ -359,7 +371,22 @@ class alg_recoleccion:
 
     def presentar_menu(self):
         global índices_restantes
-        índices_restantes = list(range(num_votantes))
+        votantes_pendientes = obtener_votantes_pendientes()
+        if not votantes_pendientes:
+            print("No quedan votantes pendientes.")
+            return
+
+        with open("censo.txt", "r", encoding="utf-8") as archivo:
+            índices_asignados = {
+                int(campos[1])
+                for linea in archivo
+                if len(campos := linea.split()) > 1
+            }
+        índices_restantes = [
+            indice
+            for indice in range(num_votantes)
+            if indice not in índices_asignados
+        ]
 
         while índices_restantes:
             print("1. Iniciar proceso de voto manual")
@@ -481,9 +508,6 @@ class alg_recuento:
             )
 
         return votos_por_candidato
-
-
-alg_recolección = alg_recuento
 
 
 if __name__ == "__main__":  
