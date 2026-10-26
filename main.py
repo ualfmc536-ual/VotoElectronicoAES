@@ -123,6 +123,64 @@ def realizar_voto_manual():
         archivo.write("\t".join(map(str, nueva_fila)) + "\n")  # Nueva fila al final
     índices_restantes.remove(index)
 
+def realizar_voto_automatico():
+    global índices_restantes
+    while índices_restantes:
+        index = generador.choice(índices_restantes)
+
+        print("Indice del votante: ", index)
+        polinomio = generar_polinomio(num_votantes + 1)
+        print("Polinomio generado: ", end="")
+        for i in range(len(polinomio)):
+            print(polinomio[i], end="")
+            if i == 0:
+                print(" + ", end="")
+                continue
+            elif i == len(polinomio) - 1:
+                print("x^" + str(i), end="")
+                break
+            if i < len(polinomio):
+                print("x^" + str(i) + " + ", end="")
+        print("\n")
+        valor = generador.randint(0, p - 1)
+        print("Valor aleatorio generado para el polinomio en el índice del votante: ", valor)
+        with open("urna.txt", "a+", encoding="utf-8") as archivo:
+            archivo.seek(0)
+            primera_fila = archivo.readline()
+            numeros_aleatorios = [int(valor) for valor in primera_fila.split()]
+        # Se calculan los valores del polinomio con los valores aleatorios
+            valores_polinomio = []
+            for i in range(len(numeros_aleatorios)):   
+                valor_polinomio = 0
+                for j in range(len(polinomio)):
+                    valor_polinomio += polinomio[j] * (numeros_aleatorios[i] ** j)
+                valores_polinomio.append(valor_polinomio % p)
+        # Se añade la nueva fila al final con el valor ingresado en el índice correspondiente
+        # Se leen las líneas existentes del archivo
+        with open("urna.txt", "r", encoding="utf-8") as archivo:
+            lineas = archivo.readlines()
+        # Calcula estos valores usando tus datos:
+        # nueva_segunda_fila
+        segunda_fila = lineas[1].strip().split()
+        valores_segunda_fila = [int(valor) for valor in segunda_fila]
+        nueva_segunda_fila = []
+        for i in range(len(numeros_aleatorios)):
+            nueva_segunda_fila.append((valores_polinomio[i] + valores_segunda_fila[i]) % p)
+
+        # nueva_fila
+        nueva_fila = []
+        for i in range(len(numeros_aleatorios)):
+            if i == index:
+                nueva_fila.append(valor)
+            else:
+                nueva_fila.append(valores_polinomio[i])
+        # Se reescriben las líneas en el archivo, reemplazando la segunda fila y agregando la nueva fila al final
+        with open("urna.txt", "w", encoding="utf-8") as archivo:
+            archivo.write(lineas[0])  # Primera fila
+            archivo.write("\t".join(map(str, nueva_segunda_fila)) + "\n")  # Nueva segunda fila
+            archivo.writelines(lineas[2:])  # Resto de las líneas
+            archivo.write("\t".join(map(str, nueva_fila)) + "\n")  # Nueva fila al final
+        índices_restantes.remove(index) 
 
 def generar_polinomio(grado: int) -> list[int]:
     if grado < 0:
@@ -136,10 +194,14 @@ def generar_polinomio(grado: int) -> list[int]:
 
     return coeficientes
 
+def realizar_recuento():
+    with open("urna.txt", "r", encoding="utf-8") as archivo:
+
 
 def main(): 
     censo_iniciado = False
     urna_iniciada = False
+    votacion_terminada = False
     while True:
         print("Menú de votación AES")
         print("Opciones:")
@@ -147,6 +209,7 @@ def main():
         print("2. Iniciar urna")
         print("3. Iniciar conjuntos de codificación")
         print("4. Iniciar proceso de voto")
+        print("5. Realizar recuento de votos")
         opcion = input("Seleccione una opción: ")
 
         if opcion == "1":
@@ -197,7 +260,10 @@ def main():
                     # Aquí se implementaría la lógica del proceso de voto
                     # Por ahora, solo mostramos un mensaje
                     print("Proceso de voto iniciado correctamente.")
-                    
+        
+        elif opcion == 5:
+            print("Realizando recuento de votos...")
+            realizar_recuento()
         else:
             print("Opción no válida. Por favor, seleccione una opción del 1 al 4.")
 
