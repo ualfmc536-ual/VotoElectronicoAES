@@ -141,7 +141,6 @@ def realizar_voto_manual():
     print("\n")
     print("Ingrese el valor del polinomio en el índice asignado: ")
     valor = int(input())
-    print("Imprimiendo el valor ingresado: ", valor)
     valor = valor % p
     with open("urna.txt", "a+", encoding="utf-8") as archivo:
         archivo.seek(0)
