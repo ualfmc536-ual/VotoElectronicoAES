@@ -4,6 +4,12 @@ Created on 24/10/2026
 """
 from random import Random
 from pathlib import Path
+import os
+from datetime import datetime
+from Crypto.Cipher import AES
+from Crypto.Hash import HMAC, SHA256
+from Crypto.Random import get_random_bytes
+
 
 # Variables globales
 generador = Random()
@@ -336,6 +342,40 @@ def main():
         else:
             print("Opción no válida. Por favor, seleccione una opción del 1 al 6.")
 
+
+def encoder(texto, clave): 
+
+   # Relleno para que el texto sea múltiplo de 16 (obligatorio en AES)
+    pad = 16 - (len(texto) % 16)
+    texto_padded = texto + bytes([pad] * pad)
+    
+    cipher = AES.new(clave, AES.MODE_CBC)
+    # Devolvemos todo junto: los 16 bytes del IV pegados al texto encriptado
+    return cipher.iv + cipher.encrypt(texto_padded)
+
+def decoder(texto, clave):
+    
+    iv = texto_encriptado[:16]
+    ciphertext = texto_encriptado[16:]
+    
+    cipher = AES.new(clave, AES.MODE_CBC, iv)
+    texto_padded = cipher.decrypt(ciphertext)
+    
+    # Quitamos el relleno y devolvemos el texto original
+    return texto_padded[:-texto_padded[-1]]
+
+def guardar_clave_texto_cifrado(clave, texto, ruta):
+    with open(ruta, "a") as f:
+        hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"{hora} | AES: {clave.hex()} | Texto Cifrado: {texto.hex()}\n")
+    
+def guardar_ruta(ruta_claves):
+    if ruta_claves is None:
+        carpeta = input("Carpeta donde se creará claves.txt (Enter para la carpeta actual): ").strip() or "."
+        os.makedirs(carpeta, exist_ok=True)
+        ruta_claves = os.path.join(carpeta, "claves.txt")
+        print("Las claves se guardarán en:", ruta_claves)
+    return ruta_claves
 
 class alg_skga:
     """Clase auxiliar para inicializar urnas y generar una clave.
