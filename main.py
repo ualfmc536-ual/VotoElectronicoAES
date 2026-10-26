@@ -14,17 +14,48 @@ conjuntos_codificacion: list[list[int]] = []   # Listas de codificación para ca
 índices_restantes = []  # Lista de índices de votantes que aún no han votado
 
 def iniciar_censo():
-    CARPETA_DATOS = Path(__file__).resolve().parent / "Documentos"
-    archivo_votantes = CARPETA_DATOS / "votantes.txt"
-    with open("censo.txt", "w") as archivo:
-        global num_votantes
-        lista = []
-        with open(archivo_votantes, "r") as votantes:
-            for linea in votantes:
-                lista.append(linea.strip())
-        num_votantes = len(lista)
-        for i in range(num_votantes):
-            archivo.write(str(lista[i]) + " \n")
+    carpeta_datos = Path(__file__).resolve().parent / "Documentos"
+    archivo_votantes = carpeta_datos / "votantes.txt"
+    with open(archivo_votantes, "r", encoding="utf-8") as votantes:
+        lista = [linea.strip() for linea in votantes if linea.strip()]
+
+    global num_votantes
+    num_votantes = len(lista)
+    with open("censo.txt", "w", encoding="utf-8") as archivo:
+        for identificador in range(1, num_votantes + 1):
+            archivo.write(f"{identificador}\n")
+
+
+def verificar_voto(id_votante: int) -> bool:
+    """Indica si el ID existe en el censo y aún no tiene índice asignado."""
+    with open("censo.txt", "r", encoding="utf-8") as archivo:
+        for linea in archivo:
+            campos = linea.split()
+            if campos and int(campos[0]) == id_votante:
+                return len(campos) == 1
+    return False
+
+
+def actualizar_censo(id_votante: int, index: int) -> None:
+    """Guarda el índice de urna asignado junto al ID del votante."""
+    with open("censo.txt", "r", encoding="utf-8") as archivo:
+        lineas = archivo.readlines()
+
+    censo_actualizado = []
+    id_encontrado = False
+    for linea in lineas:
+        campos = linea.split()
+        if campos and int(campos[0]) == id_votante:
+            censo_actualizado.append(f"{id_votante}\t{index}\n")
+            id_encontrado = True
+        else:
+            censo_actualizado.append(linea)
+
+    if not id_encontrado:
+        raise ValueError(f"El ID {id_votante} no aparece en el censo.")
+
+    with open("censo.txt", "w", encoding="utf-8") as archivo:
+        archivo.writelines(censo_actualizado)
 
 
 def iniciar_urna():
@@ -64,9 +95,27 @@ def iniciar_conjuntos_codificacion():
 
 def realizar_voto_manual():
     global índices_restantes
+    if num_votantes <= 0:
+        raise ValueError("Debe haber votantes en el censo para registrar un voto.")
+
+    while True:
+        try:
+            id_votante = int(input(f"Introduzca el ID del votante (1-{num_votantes}): "))
+        except ValueError:
+            print("El ID debe ser un número entero.")
+            continue
+
+        if 1 <= id_votante <= num_votantes:
+            if verificar_voto(id_votante):
+                break
+            print(f"El ID {id_votante} ya ha votado o no aparece en el censo.")
+        else:
+            print(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.")
+
     index = generador.choice(índices_restantes)
 
-    print("Indice del votante: ", index)
+    print("ID del votante: ", id_votante)
+    print("Índice aleatorio asignado en la urna: ", index)
     polinomio = generar_polinomio(num_votantes + 1)
     print("Polinomio generado: ", end="")
     for i in range(len(polinomio)):
@@ -80,7 +129,7 @@ def realizar_voto_manual():
         if i < len(polinomio):
             print("x^" + str(i) + " + ", end="")
     print("\n")
-    print("Ingrese el valor del polinomio en el índice del votante: ")
+    print("Ingrese el valor del polinomio en el índice asignado: ")
     valor = int(input())
     print("Imprimiendo el valor ingresado: ", valor)
     valor = valor % p
@@ -121,14 +170,33 @@ def realizar_voto_manual():
         archivo.write("\t".join(map(str, nueva_segunda_fila)) + "\n")  # Nueva segunda fila
         archivo.writelines(lineas[2:])  # Resto de las líneas
         archivo.write("\t".join(map(str, nueva_fila)) + "\n")  # Nueva fila al final
-    índices_restantes.remove(index)
+    actualizar_censo(id_votante, index)
+    índices_restantes = [indice for indice in índices_restantes if indice != index]
 
 def realizar_voto_automatico():
     global índices_restantes
     while índices_restantes:
+        with open("censo.txt", "r", encoding="utf-8") as archivo:
+            registros_censo = [linea.split() for linea in archivo if linea.strip()]
+
+        ids_pendientes = [
+            int(registro[0]) for registro in registros_censo if len(registro) == 1
+        ]
+        índices_asignados = {
+            int(registro[1]) for registro in registros_censo if len(registro) > 1
+        }
+        índices_restantes = [
+            indice for indice in índices_restantes
+            if indice not in índices_asignados
+        ]
+        if not ids_pendientes or not índices_restantes:
+            break
+
+        id_votante = generador.choice(ids_pendientes)
         index = generador.choice(índices_restantes)
 
-        print("Indice del votante: ", index)
+        print("ID del votante: ", id_votante)
+        print("Índice asignado en la urna: ", index)
         polinomio = generar_polinomio(num_votantes + 1)
         print("Polinomio generado: ", end="")
         for i in range(len(polinomio)):
@@ -180,7 +248,8 @@ def realizar_voto_automatico():
             archivo.write("\t".join(map(str, nueva_segunda_fila)) + "\n")  # Nueva segunda fila
             archivo.writelines(lineas[2:])  # Resto de las líneas
             archivo.write("\t".join(map(str, nueva_fila)) + "\n")  # Nueva fila al final
-        índices_restantes.remove(index) 
+        actualizar_censo(id_votante, index)
+        índices_restantes.remove(index)
 
 def generar_polinomio(grado: int) -> list[int]:
     if grado < 0:
@@ -194,9 +263,7 @@ def generar_polinomio(grado: int) -> list[int]:
 
     return coeficientes
 
-def realizar_recuento():
-    with open("urna.txt", "r", encoding="utf-8") as archivo:
-        archivo.write("wekala")
+
 
 def main(): 
     censo_iniciado = False
@@ -206,10 +273,11 @@ def main():
         print("Menú de votación AES")
         print("Opciones:")
         print("1. Iniciar censo electoral")
-        print("2. Iniciar urna")
+        print("2. Iniciar algoritmo SKGA")
         print("3. Iniciar conjuntos de codificación")
-        print("4. Iniciar proceso de voto")
-        print("5. Realizar recuento de votos")
+        print("4. Iniciar algoritmo de recolección y proceso de voto")
+        print("5. Iniciar algoritmo de recolección y recuento de votos")
+        print("6. Salir")
         opcion = input("Seleccione una opción: ")
 
         if opcion == "1":
@@ -223,9 +291,10 @@ def main():
             if not censo_iniciado:
                 print("Primero debe iniciar el censo electoral.")
             else:
-                print("Iniciando urna...")
-                iniciar_urna()
-                print("Urna iniciada correctamente.")
+                print("Iniciando algoritmo SKGA...")
+                algoritmo_skga = alg_skga()
+                algoritmo_skga.iniciar_urnas()
+                print("Algoritmo SKGA iniciado correctamente.")
                 urna_iniciada = True
 
         elif opcion == "3":
@@ -239,33 +308,183 @@ def main():
             if not urna_iniciada:
                 print("Primero debe iniciar la urna.")
             else:
-                global índices_restantes
-                índices_restantes = list(range(num_votantes))
-                while índices_restantes:
-                    print("1.Iniciar proceso de voto manual")
-                    print("2.Iniciar proceso de voto automático")
-                    opcion_voto = input("Seleccione una opción: ")
-                    if opcion_voto == "1":
-                        realizar_voto_manual()
-                        print("Proceso de voto manual terminado correctamente.")
-
-                    elif opcion_voto == "2":
-                        realizar_voto_automatico()
-                        print("Proceso de voto automático terminado correctamente.")
-
-                    else:
-                        print("Opción de voto no válida. Por favor, seleccione 1 o 2.")
-                    index = generador.randint(0, num_votantes - 1)
-
-                    # Aquí se implementaría la lógica del proceso de voto
-                    # Por ahora, solo mostramos un mensaje
-                    print("Proceso de voto iniciado correctamente.")
+                algoritmo_recoleccion = alg_recoleccion()
+                algoritmo_recoleccion.presentar_menu()
         
-        elif opcion == 5:
-            print("Realizando recuento de votos...")
-            realizar_recuento()
+        elif opcion == "5":
+            if not urna_iniciada:
+                print("Primero debe iniciar la urna.")
+            else:
+                print("Iniciando algoritmo de recolección y recuento de votos...")
+                algoritmo_recuento = alg_recuento()
+                algoritmo_recuento.realizar_recuento()
+                print("Recuento guardado correctamente en recuento.txt.")
+        elif opcion == "6":
+            print("Saliendo del programa.")
+            break
         else:
-            print("Opción no válida. Por favor, seleccione una opción del 1 al 4.")
+            print("Opción no válida. Por favor, seleccione una opción del 1 al 6.")
+
+
+class alg_skga:
+    """Clase auxiliar para inicializar urnas y generar una clave.
+
+    Reutiliza la lógica del flujo principal del proyecto, sin romper la
+    funcionalidad actual de main().
+    """
+    # Constructor
+    def __init__(self):
+        pass
+
+    # Función de iniciar urnas
+    def iniciar_urnas(self):
+        """Inicializa la urna utilizando la misma lógica que iniciar_urna()."""
+        if num_votantes <= 0:
+            raise ValueError("Debe iniciar el censo antes de inicializar la urna.")
+        iniciar_urna()
+        return True
+
+    # Función de crear clave
+    def crear_clave(self, longitud: int = 16) -> str:
+        """Genera una clave aleatoria de tipo numérico para la votación."""
+        if longitud <= 0:
+            raise ValueError("La longitud de la clave debe ser mayor que 0.")
+
+        clave = "".join(str(generador.randint(0, 9)) for _ in range(longitud))
+        return clave
+
+
+class alg_recoleccion:
+    """Gestiona el menú del proceso de votación."""
+
+    def presentar_menu(self):
+        global índices_restantes
+        índices_restantes = list(range(num_votantes))
+
+        while índices_restantes:
+            print("1. Iniciar proceso de voto manual")
+            print("2. Iniciar proceso de voto automático")
+            opcion_voto = input("Seleccione una opción: ")
+
+            if opcion_voto == "1":
+                self.realizar_voto_manual()
+                print("Proceso de voto manual terminado correctamente.")
+            elif opcion_voto == "2":
+                self.realizar_voto_automatico()
+                print("Proceso de voto automático terminado correctamente.")
+            else:
+                print("Opción de voto no válida. Por favor, seleccione 1 o 2.")
+
+    def realizar_voto_manual(self):
+        realizar_voto_manual()
+
+    def realizar_voto_automatico(self):
+        realizar_voto_automatico()
+
+
+class alg_recuento:
+    """Calcula el recuento por columna a partir de los datos de la urna."""
+
+    def realizar_recuento(self) -> list[int]:
+        with open("urna.txt", "r", encoding="utf-8") as archivo:
+            lineas = [linea.split() for linea in archivo if linea.strip()]
+
+        if len(lineas) < 2:
+            raise ValueError("El archivo urna.txt debe contener al menos dos líneas.")
+
+        valores_segunda_linea = [int(valor) for valor in lineas[1]]
+        if any(len(fila) != len(valores_segunda_linea) for fila in lineas):
+            raise ValueError("Las filas de urna.txt deben tener el mismo número de columnas.")
+
+        sumas_por_columna = [0] * len(valores_segunda_linea)
+
+        for fila in lineas[2:]:
+            for columna, valor in enumerate(fila):
+                sumas_por_columna[columna] = (
+                    sumas_por_columna[columna] + int(valor)
+                ) % p
+
+        recuento = [
+            (suma - valor_segunda_linea) % p
+            for suma, valor_segunda_linea in zip(
+                sumas_por_columna, valores_segunda_linea
+            )
+        ]
+
+        ruta_recuento = Path(__file__).resolve().parent / "Documentos" / "recuento.txt"
+        with open(ruta_recuento, "w", encoding="utf-8") as archivo:
+            archivo.write("Recuento de votos por columna:\n")
+            archivo.write("\t".join(map(str, recuento)) + "\n")
+
+        self.contar_votos()
+        return recuento
+
+    def contar_votos(self) -> dict[str, int]:
+        ruta_recuento = Path(__file__).resolve().parent / "Documentos" / "recuento.txt"
+        ruta_codificaciones = (
+            Path(__file__).resolve().parent / "conjuntos_codificacion.txt"
+        )
+
+        with open(ruta_recuento, "r", encoding="utf-8") as archivo:
+            lineas_recuento = archivo.readlines()
+        if len(lineas_recuento) < 2:
+            raise ValueError("recuento.txt debe contener una segunda línea con los votos.")
+        votos_por_columna = [
+            int(valor) for valor in lineas_recuento[1].split()
+        ]
+
+        codificaciones: dict[str, set[int]] = {}
+        candidato_actual = None
+        prefijo_candidato = "Conjunto de codificación del "
+        with open(ruta_codificaciones, "r", encoding="utf-8") as archivo:
+            for linea in archivo:
+                linea = linea.strip()
+                if linea.startswith(prefijo_candidato):
+                    candidato_actual = linea[len(prefijo_candidato):].rstrip(":").strip()
+                    codificaciones[candidato_actual] = set()
+                elif linea and candidato_actual is not None:
+                    codificaciones[candidato_actual].update(
+                        int(valor) for valor in linea.split()
+                    )
+
+        if not codificaciones:
+            raise ValueError("No se encontraron conjuntos de codificación de candidatos.")
+
+        votos_por_candidato = {candidato: 0 for candidato in codificaciones}
+        for valor_voto in votos_por_columna:
+            candidatos_coincidentes = [
+                candidato
+                for candidato, valores in codificaciones.items()
+                if valor_voto in valores
+            ]
+            if len(candidatos_coincidentes) != 1:
+                raise ValueError(
+                    f"El valor {valor_voto} no pertenece a un único candidato."
+                )
+            votos_por_candidato[candidatos_coincidentes[0]] += 1
+
+        for candidato, cantidad in votos_por_candidato.items():
+            print(f"{candidato}: {cantidad} votos")
+
+        maximo_votos = max(votos_por_candidato.values())
+        candidatos_ganadores = [
+            candidato
+            for candidato, cantidad in votos_por_candidato.items()
+            if cantidad == maximo_votos
+        ]
+        if len(candidatos_ganadores) == 1:
+            print(f"Candidato con mayor número de votos: {candidatos_ganadores[0]}")
+        else:
+            print(
+                "Empate en el mayor número de votos: "
+                + ", ".join(candidatos_ganadores)
+            )
+
+        return votos_por_candidato
+
+
+alg_recolección = alg_recuento
+
 
 if __name__ == "__main__":  
     main()

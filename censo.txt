@@ -1,10 +1,10 @@
-Francisco Montes Checa 
-Francisco Sánchez Sánchez 
-Jose Antonio Sánchez Aguilera 
-Miguel Guerra Rodríguez 
-Vicente Torres Calbañez 
-Alberto Blanco Leal 
-Ramón Rallardo Ramos 
-Rick Sánchez Rodríguez 
-Mario Gispert Ramírez 
-Ikerne Soriano Gálvez 
+1	7
+2	0
+3	6
+4	5
+5	9
+6	8
+7	2
+8	3
+9	4
+10	1
