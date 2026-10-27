@@ -1,2 +1,2 @@
 Recuento de votos por columna:
-2	1	4	4	12	1	12	11	1	8
+9	0	5	4	3	0	0	3	6	7

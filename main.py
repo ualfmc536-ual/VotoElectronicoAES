@@ -365,9 +365,10 @@ def decoder(texto, clave):
     return texto_padded[:-texto_padded[-1]]
 
 def guardar_clave_texto_cifrado(clave, texto, ruta):
+    
     with open(ruta, "a") as f:
         hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"{hora} | AES: {clave.hex()} | Texto Cifrado: {texto.hex()}\n")
+        f.write(f"{hora} | AES: {clave} | Texto Cifrado: {texto}\n")
     
 def guardar_ruta(ruta_claves):
     if ruta_claves is None:
@@ -396,14 +397,35 @@ class alg_skga:
         return True
 
     # Función de crear clave
-    def crear_clave(self, longitud: int = 16) -> str:
+    def crear_clave() -> str:
         """Genera una clave aleatoria de tipo numérico para la votación."""
-        if longitud <= 0:
-            raise ValueError("La longitud de la clave debe ser mayor que 0.")
-
-        clave = "".join(str(generador.randint(0, 9)) for _ in range(longitud))
+        clave = get_random_bytes(16);
         return clave
-
+    
+    def encriptar_control_urna():
+        # 1. Leer el archivo y crear la lista de números
+       with open('urna.txt', 'r') as archivo:
+        # readlines() devuelve una lista donde cada elemento es una línea del txt
+        lineas = archivo.readlines()
+        
+        # Verificamos que el archivo tenga al menos 2 líneas para evitar errores
+        if len(lineas) >= 2:
+            segunda_linea = lineas[1]  # El índice 1 corresponde a la segunda línea
+            numeros = [int(n) for n in segunda_linea.split()]
+        else:
+            print("Error: El archivo no tiene una segunda línea.")
+            return [] # O manejar el error como prefieras
+            
+        clave = crear_clave()
+    
+    # 2. Modificar los números
+       for i in range(len(numeros)):
+            numero_hex = hex(numeros[i]) 
+            numeros[i] = encoder(numero_hex, clave)
+        
+       guardar_clave_texto_cifrado(clave, numeros, ruta)
+        
+       return numeros    
 
 class alg_recoleccion:
     """Gestiona el menú del proceso de votación."""
