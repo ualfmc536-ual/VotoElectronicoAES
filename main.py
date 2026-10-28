@@ -2,6 +2,7 @@
 Created on 24/10/2026
 @author: francisco montes, miguel, jose antonio, francisco sánchez
 """
+import ast
 from random import Random
 from pathlib import Path
 import os
@@ -298,7 +299,8 @@ def main():
         print("3. Iniciar conjuntos de codificación")
         print("4. Iniciar algoritmo de recolección y proceso de voto")
         print("5. Iniciar algoritmo de recuento y recuento de votos")
-        print("6. Salir")
+        print("6. Desencriptar mensaje")
+        print("7. Salir")
         opcion = input("Seleccione una opción: ")
 
         if opcion == "1":
@@ -343,10 +345,32 @@ def main():
                 algoritmo_recuento.realizar_recuento()
                 print("Recuento guardado correctamente en recuento.txt.")
         elif opcion == "6":
+            try:
+                texto_encriptado = ast.literal_eval(
+                    input("Introduzca el texto cifrado en formato bytes (b'...'): ")
+                )
+                clave_descifrado = ast.literal_eval(
+                    input("Introduzca la clave en formato bytes (b'...'): ")
+                )
+            except (SyntaxError, ValueError) as error:
+                print(f"Formato de entrada no válido: {error}")
+                continue
+
+            if not isinstance(texto_encriptado, bytes) or not isinstance(
+                clave_descifrado, bytes
+            ):
+                print("El texto cifrado y la clave deben introducirse como bytes (b'...').")
+                continue
+
+            try:
+                print(decoder(texto_encriptado, clave_descifrado))
+            except (IndexError, UnicodeDecodeError, ValueError) as error:
+                print(f"No se pudo desencriptar el mensaje: {error}")
+        elif opcion == "7":
             print("Saliendo del programa.")
             break
         else:
-            print("Opción no válida. Por favor, seleccione una opción del 1 al 6.")
+            print("Opción no válida. Por favor, seleccione una opción del 1 al 7.")
 
 
 def encoder(texto: str, clave: bytes) -> bytes:
