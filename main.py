@@ -138,7 +138,7 @@ def realizar_voto_manual():
             mensaje_encriptado = encoder(str(mensaje_no_encriptado),clave_k)
 
             print ("Mensaje encriptado: ", mensaje_encriptado.hex())
-            guardar_clave_texto_cifrado(clave_k)
+            guardar_clave_secundaria(clave_k)
             
             id_votante = int(decoder(mensaje_encriptado,clave_k))
 
@@ -163,11 +163,6 @@ def realizar_voto_manual():
             print(decoder(mensaje_encriptado,clave_k))
         
     index = generador.choice(índices_restantes)
-
-    mensaje_encriptado = encoder(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.",clave_k)
-    print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
-    print("Desencriptando mensaje...")
-    print(decoder(mensaje_encriptado,clave_k))
 
     respuesta = "Índice aleatorio asignado en la urna: " + str(index) + "\n"
     respuesta += "Polinomio generado: "
@@ -202,7 +197,7 @@ def realizar_voto_manual():
     mensaje_encriptado = encoder(str(mensaje_no_encriptado),clave_k)
     
     print ("Mensaje encriptado: ", mensaje_encriptado.hex())
-    guardar_clave_texto_cifrado(clave_k)
+    guardar_clave_secundaria(clave_k)
                 
     valor = int(decoder(mensaje_encriptado,clave_k))
     
@@ -457,6 +452,12 @@ def guardar_clave_texto_cifrado(clave_bytes: bytes):
     with open("claves.txt", "a", encoding="utf-8") as f:
         hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         f.write(f"{hora} | AES: {clave_bytes.hex()} \n")
+
+def guardar_clave_secundaria(clave_bytes: bytes):
+    with open("claves.txt", "a", encoding="utf-8") as f:
+        hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"\t{hora} | Clave secundaria: {clave_bytes.hex()} \n")
+
 
 
 class alg_skga:
