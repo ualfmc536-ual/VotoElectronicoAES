@@ -125,42 +125,86 @@ def iniciar_conjuntos_codificacion():
 
 def realizar_voto_manual():
     global índices_restantes
+    clave_k = 0
     if num_votantes <= 0:
         raise ValueError("Debe haber votantes en el censo para registrar un voto.")
 
     while True:
         try:
-            id_votante = int(input(f"Introduzca el ID del votante (1-{num_votantes}): "))
+            mensaje_no_encriptado = input(f"Introduzca el ID del votante (1-{num_votantes}): ")
+            print("Enviando mensaje encriptado...")
+            clave_k = get_random_bytes(16)
+
+            mensaje_encriptado = encoder(str(mensaje_no_encriptado),clave_k)
+
+            print ("Mensaje encriptado: ", mensaje_encriptado.hex())
+            guardar_clave_texto_cifrado(clave_k)
+            
+            id_votante = int(decoder(mensaje_encriptado,clave_k))
+
         except ValueError:
-            print("El ID debe ser un número entero.")
+            mensaje_encriptado = encoder("El ID debe ser un número entero.",clave_k)
+            print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+            print("Desencriptando mensaje...")
+            print(decoder(mensaje_encriptado,clave_k))
             continue
 
         if 1 <= id_votante <= num_votantes:
             if verificar_voto(id_votante):
                 break
-            print(f"El ID {id_votante} ya ha votado o no aparece en el censo.")
+            mensaje_encriptado = encoder(f"El ID {id_votante} ya ha votado o no aparece en el censo.",clave_k)
+            print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+            print("Desencriptando mensaje...")
+            print(decoder(mensaje_encriptado,clave_k))
         else:
-            print(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.")
-
+            mensaje_encriptado = encoder(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.",clave_k)
+            print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+            print("Desencriptando mensaje...")
+            print(decoder(mensaje_encriptado,clave_k))
+        
     index = generador.choice(índices_restantes)
 
-    print("ID del votante: ", id_votante)
-    print("Índice aleatorio asignado en la urna: ", index)
+    mensaje_encriptado = encoder(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.",clave_k)
+    print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+    print("Desencriptando mensaje...")
+    print(decoder(mensaje_encriptado,clave_k))
+
+    respuesta = "Índice aleatorio asignado en la urna: " + str(index) + "\n"
+    respuesta += "Polinomio generado: "
+    # print("Índice aleatorio asignado en la urna: ", index)
     polinomio = generar_polinomio(num_votantes + 1)
-    print("Polinomio generado: ", end="")
+    # print("Polinomio generado: ", end="")
     for i in range(len(polinomio)):
-        print(polinomio[i], end="")
+        respuesta += str(polinomio[i]) 
         if i == 0:
-            print(" + ", end="")
+            respuesta += " + "
             continue
         elif i == len(polinomio) - 1:
-            print("x^" + str(i), end="")
+            respuesta += "x^" + str(i)
             break
         if i < len(polinomio):
-            print("x^" + str(i) + " + ", end="")
-    print("\n")
-    print("Ingrese el valor del polinomio en el índice asignado: ")
+            respuesta += "x^" + str(i) + " + "
+    respuesta += "\n"
+    respuesta += "Ingrese el valor del polinomio en el índice asignado: "
+
+    mensaje_encriptado = encoder(respuesta,clave_k)
+    print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+    print("Desencriptando mensaje...")
+    print(decoder(mensaje_encriptado,clave_k))
+
     valor = int(input()) % p
+
+    mensaje_no_encriptado = str(valor)
+    
+    print("Enviando mensaje encriptado...")
+    clave_k = get_random_bytes(16)
+    
+    mensaje_encriptado = encoder(str(mensaje_no_encriptado),clave_k)
+    
+    print ("Mensaje encriptado: ", mensaje_encriptado.hex())
+    guardar_clave_texto_cifrado(clave_k)
+                
+    valor = int(decoder(mensaje_encriptado,clave_k))
     
     with open("urna.txt", "r", encoding="utf-8") as archivo:
         lineas = archivo.readlines()
