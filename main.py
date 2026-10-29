@@ -2,6 +2,7 @@
 Created on 24/10/2026
 @author: francisco montes, miguel, jose antonio, francisco sánchez
 """
+import ast
 from random import Random
 from pathlib import Path
 import os
@@ -12,6 +13,7 @@ from Crypto.Random import get_random_bytes
 
 
 # Variables globales
+clave: bytes = b""
 generador = Random()
 p = 13                  # Número primo para el módulo
 num_votantes = 0        # Número de votantes
@@ -19,9 +21,16 @@ nº_candidatos = 2       # Número de candidatos
 conjuntos_codificacion: list[list[int]] = []   # Listas de codificación para cada candidato
 índices_restantes = []  # Lista de índices de votantes que aún no han votado
 
+
 def iniciar_censo():
     carpeta_datos = Path(__file__).resolve().parent / "Documentos"
+    carpeta_datos.mkdir(parents=True, exist_ok=True)
     archivo_votantes = carpeta_datos / "votantes.txt"
+    
+    if not archivo_votantes.exists():
+        with open(archivo_votantes, "w", encoding="utf-8") as votantes:
+            votantes.write("Votante 1\nVotante 2\nVotante 3\n")
+
     with open(archivo_votantes, "r", encoding="utf-8") as votantes:
         lista = [linea.strip() for linea in votantes if linea.strip()]
 
@@ -75,13 +84,21 @@ def actualizar_censo(id_votante: int, index: int) -> None:
 
 
 def iniciar_urna():
-    with open("urna.txt", "w") as archivo:
+    global clave
+    clave = alg_skga.crear_clave()
+    guardar_clave_texto_cifrado(clave)
+  
+    with open("urna.txt", "w", encoding="utf-8") as archivo:
         for i in range(num_votantes):
-            archivo.write(str(generador.randint(0, 100)%p) + " \t")
+            archivo.write(str(generador.randint(0, 100) % p) + " \t")
         archivo.write("\n")
+        
+        cero = encoder(str(0), clave)
         for i in range(num_votantes):
-            archivo.write(str(0) + " \t")
+            # Guardamos en formato hexadecimal legible por fromhex()
+            archivo.write(cero.hex() + " \t\t")
         archivo.write("\n")
+
 
 def iniciar_conjuntos_codificacion():
     global conjuntos_codificacion
@@ -90,18 +107,15 @@ def iniciar_conjuntos_codificacion():
     for i in range(nº_candidatos):
         lista_candidatos.append("Candidato " + str(i + 1))
         conjuntos_codificacion.append([lista_candidatos[i]])
-    lista_numeros = []
+    lista_numeros = list(range(p))
 
     for i in range(p):
-        lista_numeros.append(i)
-
-    for i in range (p):
-        numero_aleatorio = generador.randint(0, len(lista_numeros)-1)
+        numero_aleatorio = generador.randint(0, len(lista_numeros) - 1)
         candidato_index = i % len(lista_candidatos)
         conjuntos_codificacion[candidato_index].append(lista_numeros[numero_aleatorio]) 
         lista_numeros.pop(numero_aleatorio)
 
-    with open("conjuntos_codificacion.txt", "w") as archivo:
+    with open("conjuntos_codificacion.txt", "w", encoding="utf-8") as archivo:
         for i in range(len(conjuntos_codificacion)):
             archivo.write("Conjunto de codificación del " + conjuntos_codificacion[i][0] + ": \n")
             for j in range(1, len(conjuntos_codificacion[i])):
@@ -111,67 +125,114 @@ def iniciar_conjuntos_codificacion():
 
 def realizar_voto_manual():
     global índices_restantes
+    clave_k = 0
     if num_votantes <= 0:
         raise ValueError("Debe haber votantes en el censo para registrar un voto.")
 
     while True:
         try:
-            id_votante = int(input(f"Introduzca el ID del votante (1-{num_votantes}): "))
+            mensaje_no_encriptado = input(f"Introduzca el ID del votante (1-{num_votantes}): ")
+            print("Enviando mensaje encriptado...")
+            clave_k = get_random_bytes(16)
+
+            mensaje_encriptado = encoder(str(mensaje_no_encriptado),clave_k)
+
+            print ("Mensaje encriptado: ", mensaje_encriptado.hex())
+            guardar_clave_texto_cifrado(clave_k)
+            
+            id_votante = int(decoder(mensaje_encriptado,clave_k))
+
         except ValueError:
-            print("El ID debe ser un número entero.")
+            mensaje_encriptado = encoder("El ID debe ser un número entero.",clave_k)
+            print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+            print("Desencriptando mensaje...")
+            print(decoder(mensaje_encriptado,clave_k))
             continue
 
         if 1 <= id_votante <= num_votantes:
             if verificar_voto(id_votante):
                 break
-            print(f"El ID {id_votante} ya ha votado o no aparece en el censo.")
+            mensaje_encriptado = encoder(f"El ID {id_votante} ya ha votado o no aparece en el censo.",clave_k)
+            print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+            print("Desencriptando mensaje...")
+            print(decoder(mensaje_encriptado,clave_k))
         else:
-            print(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.")
-
+            mensaje_encriptado = encoder(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.",clave_k)
+            print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+            print("Desencriptando mensaje...")
+            print(decoder(mensaje_encriptado,clave_k))
+        
     index = generador.choice(índices_restantes)
 
-    print("ID del votante: ", id_votante)
-    print("Índice aleatorio asignado en la urna: ", index)
+    mensaje_encriptado = encoder(f"ID no válido. Introduzca un número entre 1 y {num_votantes}.",clave_k)
+    print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+    print("Desencriptando mensaje...")
+    print(decoder(mensaje_encriptado,clave_k))
+
+    respuesta = "Índice aleatorio asignado en la urna: " + str(index) + "\n"
+    respuesta += "Polinomio generado: "
+    # print("Índice aleatorio asignado en la urna: ", index)
     polinomio = generar_polinomio(num_votantes + 1)
-    print("Polinomio generado: ", end="")
+    # print("Polinomio generado: ", end="")
     for i in range(len(polinomio)):
-        print(polinomio[i], end="")
+        respuesta += str(polinomio[i]) 
         if i == 0:
-            print(" + ", end="")
+            respuesta += " + "
             continue
         elif i == len(polinomio) - 1:
-            print("x^" + str(i), end="")
+            respuesta += "x^" + str(i)
             break
         if i < len(polinomio):
-            print("x^" + str(i) + " + ", end="")
-    print("\n")
-    print("Ingrese el valor del polinomio en el índice asignado: ")
-    valor = int(input())
-    valor = valor % p
-    with open("urna.txt", "a+", encoding="utf-8") as archivo:
-        archivo.seek(0)
-        primera_fila = archivo.readline()
-        numeros_aleatorios = [int(valor) for valor in primera_fila.split()]
-    # Se calculan los valores del polinomio con los valores aleatorios
-        valores_polinomio = []
-        for i in range(len(numeros_aleatorios)):   
-            valor_polinomio = 0
-            for j in range(len(polinomio)):
-                valor_polinomio += polinomio[j] * (numeros_aleatorios[i] ** j)
-            valores_polinomio.append(valor_polinomio % p)
-    # Se añade la nueva fila al final con el valor ingresado en el índice correspondiente
-    # Se leen las líneas existentes del archivo
+            respuesta += "x^" + str(i) + " + "
+    respuesta += "\n"
+    respuesta += "Ingrese el valor del polinomio en el índice asignado: "
+
+    mensaje_encriptado = encoder(respuesta,clave_k)
+    print("Recibiendo mensaje encriptado: ", mensaje_encriptado)
+    print("Desencriptando mensaje...")
+    print(decoder(mensaje_encriptado,clave_k))
+
+    valor = int(input()) % p
+
+    mensaje_no_encriptado = str(valor)
+    
+    print("Enviando mensaje encriptado...")
+    clave_k = get_random_bytes(16)
+    
+    mensaje_encriptado = encoder(str(mensaje_no_encriptado),clave_k)
+    
+    print ("Mensaje encriptado: ", mensaje_encriptado.hex())
+    guardar_clave_texto_cifrado(clave_k)
+                
+    valor = int(decoder(mensaje_encriptado,clave_k))
+    
     with open("urna.txt", "r", encoding="utf-8") as archivo:
         lineas = archivo.readlines()
-    # Calcula estos valores usando tus datos:
-    # nueva_segunda_fila
+
+    primera_fila = lineas[0]
+    numeros_aleatorios = [int(v) for v in primera_fila.split()]
+
+    valores_polinomio = []
+    for i in range(len(numeros_aleatorios)):   
+        valor_polinomio = 0
+        for j in range(len(polinomio)):
+            valor_polinomio += polinomio[j] * (numeros_aleatorios[i] ** j)
+        valores_polinomio.append(valor_polinomio % p)
+
     segunda_fila = lineas[1].strip().split()
-    valores_segunda_fila = [int(valor) for valor in segunda_fila]
+    for i in range(len(segunda_fila)):
+        datos_en_bytes = bytes.fromhex(segunda_fila[i])
+        segunda_fila[i] = decoder(datos_en_bytes, clave)
+
+    valores_segunda_fila = [int(v) for v in segunda_fila]
     nueva_segunda_fila = []
     for i in range(len(numeros_aleatorios)):
         nueva_segunda_fila.append((valores_polinomio[i] + valores_segunda_fila[i]) % p)
 
-    # nueva_fila
+    for i in range(len(nueva_segunda_fila)):
+        texto_cifrado_bytes = encoder(str(nueva_segunda_fila[i]), clave)
+        nueva_segunda_fila[i] = texto_cifrado_bytes.hex()
+
     nueva_fila = []
     for i in range(len(numeros_aleatorios)):
         if i == index:
@@ -179,124 +240,130 @@ def realizar_voto_manual():
         else:
             nueva_fila.append(valores_polinomio[i])
 
-    # Se reescriben las líneas en el archivo, reemplazando la segunda fila y agregando la nueva fila al final
     with open("urna.txt", "w", encoding="utf-8") as archivo:
-        archivo.write(lineas[0])  # Primera fila
-        archivo.write("\t".join(map(str, nueva_segunda_fila)) + "\n")  # Nueva segunda fila
-        archivo.writelines(lineas[2:])  # Resto de las líneas
-        archivo.write("\t".join(map(str, nueva_fila)) + "\n")  # Nueva fila al final
+        archivo.write(lineas[0])
+        archivo.write("\t".join(nueva_segunda_fila) + "\n")
+        archivo.writelines(lineas[2:])
+        archivo.write("\t".join(map(str, nueva_fila)) + "\n")
+
     actualizar_censo(id_votante, index)
-    índices_restantes = [indice for indice in índices_restantes if indice != index]
+    índices_restantes = [i for i in índices_restantes if i != index]
+
+def formatear_polinomio(coeficientes: list[int]) -> str:
+    """Convierte la lista de coeficientes [a0, a1, a2, ...] en una cadena legible: a0 + a1*x + a2*x^2 ..."""
+    terminos = []
+    for grado, coef in enumerate(coeficientes):
+        if grado == 0:
+            terminos.append(str(coef))
+        elif grado == 1:
+            terminos.append(f"{coef}x")
+        else:
+            terminos.append(f"{coef}x^{grado}")
+    return " + ".join(terminos)
+
 
 def realizar_voto_automatico():
     global índices_restantes
-    while índices_restantes:
-        with open("censo.txt", "r", encoding="utf-8") as archivo:
-            registros_censo = [linea.split() for linea in archivo if linea.strip()]
 
-        ids_pendientes = [
-            int(registro[0]) for registro in registros_censo if len(registro) == 1
-        ]
-        índices_asignados = {
-            int(registro[1]) for registro in registros_censo if len(registro) > 1
-        }
-        índices_restantes = [
-            indice for indice in índices_restantes
-            if indice not in índices_asignados
-        ]
-        if not ids_pendientes or not índices_restantes:
-            break
+    with open("censo.txt", "r", encoding="utf-8") as archivo:
+        registros_censo = [linea.split() for linea in archivo if linea.strip()]
 
+    ids_pendientes = [int(r[0]) for r in registros_censo if len(r) == 1]
+    índices_ocupados = {int(r[1]) for r in registros_censo if len(r) > 1}
+    índices_libres = [i for i in range(num_votantes) if i not in índices_ocupados]
+
+    if not ids_pendientes or not índices_libres:
+        print("No hay votantes pendientes o ya no quedan urnas libres.")
+        return
+
+    while ids_pendientes and índices_libres:
         id_votante = generador.choice(ids_pendientes)
-        index = generador.choice(índices_restantes)
+        index = generador.choice(índices_libres)
 
-        print("ID del votante: ", id_votante)
-        print("Índice asignado en la urna: ", index)
+        print(f"ID del votante: {id_votante}")
+        print(f"Índice asignado en la urna: {index}")
+
+        # Generar y mostrar el polinomio
         polinomio = generar_polinomio(num_votantes + 1)
-        print("Polinomio generado: ", end="")
-        for i in range(len(polinomio)):
-            print(polinomio[i], end="")
-            if i == 0:
-                print(" + ", end="")
-                continue
-            elif i == len(polinomio) - 1:
-                print("x^" + str(i), end="")
-                break
-            if i < len(polinomio):
-                print("x^" + str(i) + " + ", end="")
-        print("\n")
+        texto_polinomio = formatear_polinomio(polinomio)
+        print(f"Polinomio generado: {texto_polinomio}")
+
         valor = generador.randint(0, p - 1)
-        print("Valor aleatorio generado para el polinomio en el índice del votante: ", valor)
-        with open("urna.txt", "a+", encoding="utf-8") as archivo:
-            archivo.seek(0)
-            primera_fila = archivo.readline()
-            numeros_aleatorios = [int(valor) for valor in primera_fila.split()]
-        # Se calculan los valores del polinomio con los valores aleatorios
-            valores_polinomio = []
-            for i in range(len(numeros_aleatorios)):   
-                valor_polinomio = 0
-                for j in range(len(polinomio)):
-                    valor_polinomio += polinomio[j] * (numeros_aleatorios[i] ** j)
-                valores_polinomio.append(valor_polinomio % p)
-        # Se añade la nueva fila al final con el valor ingresado en el índice correspondiente
-        # Se leen las líneas existentes del archivo
+        print(f"Valor aleatorio generado para el polinomio en el índice del votante: {valor}\n")
+
         with open("urna.txt", "r", encoding="utf-8") as archivo:
             lineas = archivo.readlines()
-        # Calcula estos valores usando tus datos:
-        # nueva_segunda_fila
-        segunda_fila = lineas[1].strip().split()
-        valores_segunda_fila = [int(valor) for valor in segunda_fila]
-        nueva_segunda_fila = []
-        for i in range(len(numeros_aleatorios)):
-            nueva_segunda_fila.append((valores_polinomio[i] + valores_segunda_fila[i]) % p)
 
-        # nueva_fila
+        primera_fila = lineas[0]
+        numeros_aleatorios = [int(v) for v in primera_fila.split()]
+
+        # Evaluar polinomio
+        valores_polinomio = []
+        for aleatorio in numeros_aleatorios:
+            val = 0
+            for grado, coef in enumerate(polinomio):
+                val += coef * (aleatorio ** grado)
+            valores_polinomio.append(val % p)
+
+        # Descifrar la segunda fila
+        segunda_fila = lineas[1].strip().split()
+        valores_segunda_fila = []
+        for elem_hex in segunda_fila:
+            elem_bytes = bytes.fromhex(elem_hex)
+            valores_segunda_fila.append(int(decoder(elem_bytes, clave)))
+
+        # Sumar y volver a cifrar
+        nueva_segunda_fila_hex = []
+        for i in range(len(numeros_aleatorios)):
+            suma = (valores_polinomio[i] + valores_segunda_fila[i]) % p
+            cifrado_bytes = encoder(str(suma), clave)
+            nueva_segunda_fila_hex.append(cifrado_bytes.hex())
+
         nueva_fila = []
         for i in range(len(numeros_aleatorios)):
             if i == index:
                 nueva_fila.append(valor)
             else:
                 nueva_fila.append(valores_polinomio[i])
-        # Se reescriben las líneas en el archivo, reemplazando la segunda fila y agregando la nueva fila al final
+
         with open("urna.txt", "w", encoding="utf-8") as archivo:
-            archivo.write(lineas[0])  # Primera fila
-            archivo.write("\t".join(map(str, nueva_segunda_fila)) + "\n")  # Nueva segunda fila
-            archivo.writelines(lineas[2:])  # Resto de las líneas
-            archivo.write("\t".join(map(str, nueva_fila)) + "\n")  # Nueva fila al final
+            archivo.write(lineas[0])
+            archivo.write("\t".join(nueva_segunda_fila_hex) + "\n")
+            archivo.writelines(lineas[2:])
+            archivo.write("\t".join(map(str, nueva_fila)) + "\n")
+
         actualizar_censo(id_votante, index)
-        índices_restantes.remove(index)
+
+        ids_pendientes.remove(id_votante)
+        índices_libres.remove(index)
+
+    índices_restantes = índices_libres
 
 def generar_polinomio(grado: int) -> list[int]:
     if grado < 0:
         raise ValueError("El grado debe ser mayor o igual que 0")
 
-    # Coeficientes desde el término independiente hasta x^(grado - 1).
     coeficientes = [generador.randrange(p) for _ in range(grado)]
-
-    # El coeficiente principal no puede ser 0 si queremos ese grado exacto.
     coeficientes.append(generador.randrange(1, p))
-
     return coeficientes
-
 
 
 def main(): 
     censo_iniciado = False
     urna_iniciada = False
-    votacion_terminada = False
     while True:
-        print("Menú de votación AES")
-        print("Opciones:")
+        print("\nMenú de votación AES")
         print("1. Iniciar censo electoral")
         print("2. Iniciar algoritmo SKGA")
         print("3. Iniciar conjuntos de codificación")
         print("4. Iniciar algoritmo de recolección y proceso de voto")
         print("5. Iniciar algoritmo de recuento y recuento de votos")
-        print("6. Salir")
+        print("6. Desencriptar mensaje")
+        print("7. Salir")
         opcion = input("Seleccione una opción: ")
 
         if opcion == "1":
-            urna_iniciada = False  # Reiniciar el estado de la urna al iniciar un nuevo censo
+            urna_iniciada = False
             print("Iniciando censo electoral...")
             iniciar_censo()
             print("Censo electoral iniciado correctamente.")
@@ -336,78 +403,78 @@ def main():
                 algoritmo_recuento = alg_recuento()
                 algoritmo_recuento.realizar_recuento()
                 print("Recuento guardado correctamente en recuento.txt.")
+
         elif opcion == "6":
+            texto_hex = input("Introduzca el texto cifrado en hexadecimal: ").strip()
+            clave_hex = input("Introduzca la clave en hexadecimal: ").strip()
+
+            try:
+                texto_bytes = bytes.fromhex(texto_hex)
+                clave_bytes = bytes.fromhex(clave_hex)
+            except ValueError:
+                print("Error: Una de las entradas no contiene caracteres hexadecimales válidos.")
+                continue
+
+            if len(clave_bytes) not in (16, 24, 32):
+                print(f"Error: La clave debe tener 16, 24 o 32 bytes (32, 48 o 64 caracteres hex). Longitud actual: {len(clave_bytes)} bytes.")
+                continue
+
+            if len(texto_bytes) < 32 or len(texto_bytes) % 16 != 0:
+                print("Error: El texto cifrado debe incluir el IV (16 bytes) y bloques múltiplos de 16 bytes.")
+                continue
+
+            try:
+                mensaje = decoder(texto_bytes, clave_bytes)
+                print(f"Mensaje descifrado: {mensaje}")
+            except Exception as error:
+                print(f"No se pudo desencriptar el mensaje: {error}")
+        elif opcion == "7":
             print("Saliendo del programa.")
             break
         else:
-            print("Opción no válida. Por favor, seleccione una opción del 1 al 6.")
+            print("Opción no válida. Por favor, seleccione una opción del 1 al 7.")
 
 
-def encoder(texto, clave): 
-
-   # Relleno para que el texto sea múltiplo de 16 (obligatorio en AES)
-    pad = 16 - (len(texto) % 16)
-    texto_padded = texto + bytes([pad] * pad)
-    
+def encoder(texto: str, clave: bytes) -> bytes:
+    texto_bytes = str(texto).encode("utf-8")
+    pad = 16 - (len(texto_bytes) % 16)
+    texto_padded = texto_bytes + bytes([pad] * pad)
     cipher = AES.new(clave, AES.MODE_CBC)
-    # Devolvemos todo junto: los 16 bytes del IV pegados al texto encriptado
     return cipher.iv + cipher.encrypt(texto_padded)
 
-def decoder(texto, clave):
-    
+
+def decoder(texto_encriptado: bytes, clave: bytes) -> str:
     iv = texto_encriptado[:16]
     ciphertext = texto_encriptado[16:]
-    
     cipher = AES.new(clave, AES.MODE_CBC, iv)
     texto_padded = cipher.decrypt(ciphertext)
-    
-    # Quitamos el relleno y devolvemos el texto original
-    return texto_padded[:-texto_padded[-1]]
+    pad = texto_padded[-1]
+    texto_bytes = texto_padded[:-pad]
+    return texto_bytes.decode("utf-8")
 
-def guardar_clave_texto_cifrado(clave, texto, ruta):
-    with open(ruta, "a") as f:
+
+def guardar_clave_texto_cifrado(clave_bytes: bytes):
+    with open("claves.txt", "a", encoding="utf-8") as f:
         hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"{hora} | AES: {clave.hex()} | Texto Cifrado: {texto.hex()}\n")
-    
-def guardar_ruta(ruta_claves):
-    if ruta_claves is None:
-        carpeta = input("Carpeta donde se creará claves.txt (Enter para la carpeta actual): ").strip() or "."
-        os.makedirs(carpeta, exist_ok=True)
-        ruta_claves = os.path.join(carpeta, "claves.txt")
-        print("Las claves se guardarán en:", ruta_claves)
-    return ruta_claves
+        f.write(f"{hora} | AES: {clave_bytes.hex()} \n")
+
 
 class alg_skga:
-    """Clase auxiliar para inicializar urnas y generar una clave.
-
-    Reutiliza la lógica del flujo principal del proyecto, sin romper la
-    funcionalidad actual de main().
-    """
-    # Constructor
     def __init__(self):
         pass
 
-    # Función de iniciar urnas
     def iniciar_urnas(self):
-        """Inicializa la urna utilizando la misma lógica que iniciar_urna()."""
         if num_votantes <= 0:
             raise ValueError("Debe iniciar el censo antes de inicializar la urna.")
         iniciar_urna()
         return True
 
-    # Función de crear clave
-    def crear_clave(self, longitud: int = 16) -> str:
-        """Genera una clave aleatoria de tipo numérico para la votación."""
-        if longitud <= 0:
-            raise ValueError("La longitud de la clave debe ser mayor que 0.")
-
-        clave = "".join(str(generador.randint(0, 9)) for _ in range(longitud))
-        return clave
+    @staticmethod
+    def crear_clave() -> bytes:
+        return get_random_bytes(16)
 
 
 class alg_recoleccion:
-    """Gestiona el menú del proceso de votación."""
-
     def presentar_menu(self):
         global índices_restantes
         votantes_pendientes = obtener_votantes_pendientes()
@@ -427,9 +494,10 @@ class alg_recoleccion:
             if indice not in índices_asignados
         ]
 
-        while índices_restantes:
-            print("1. Iniciar proceso de voto manual")
+        while índices_restantes and obtener_votantes_pendientes():
+            print("\n1. Iniciar proceso de voto manual")
             print("2. Iniciar proceso de voto automático")
+            print("3. Volver al menú principal")
             opcion_voto = input("Seleccione una opción: ")
 
             if opcion_voto == "1":
@@ -438,8 +506,10 @@ class alg_recoleccion:
             elif opcion_voto == "2":
                 self.realizar_voto_automatico()
                 print("Proceso de voto automático terminado correctamente.")
+            elif opcion_voto == "3":
+                break
             else:
-                print("Opción de voto no válida. Por favor, seleccione 1 o 2.")
+                print("Opción de voto no válida. Por favor, seleccione 1, 2 o 3.")
 
     def realizar_voto_manual(self):
         realizar_voto_manual()
@@ -449,8 +519,6 @@ class alg_recoleccion:
 
 
 class alg_recuento:
-    """Calcula el recuento por columna a partir de los datos de la urna."""
-
     def realizar_recuento(self) -> list[int]:
         with open("urna.txt", "r", encoding="utf-8") as archivo:
             lineas = [linea.split() for linea in archivo if linea.strip()]
@@ -458,7 +526,12 @@ class alg_recuento:
         if len(lineas) < 2:
             raise ValueError("El archivo urna.txt debe contener al menos dos líneas.")
 
-        valores_segunda_linea = [int(valor) for valor in lineas[1]]
+        # Desciframos la segunda fila que está guardada en hex AES
+        segunda_fila_hex = lineas[1]
+        valores_segunda_linea = [
+            int(decoder(bytes.fromhex(item), clave)) for item in segunda_fila_hex
+        ]
+
         if any(len(fila) != len(valores_segunda_linea) for fila in lineas):
             raise ValueError("Las filas de urna.txt deben tener el mismo número de columnas.")
 
@@ -478,6 +551,7 @@ class alg_recuento:
         ]
 
         ruta_recuento = Path(__file__).resolve().parent / "Documentos" / "recuento.txt"
+        ruta_recuento.parent.mkdir(parents=True, exist_ok=True)
         with open(ruta_recuento, "w", encoding="utf-8") as archivo:
             archivo.write("Recuento de votos por columna:\n")
             archivo.write("\t".join(map(str, recuento)) + "\n")
@@ -529,6 +603,7 @@ class alg_recuento:
                 )
             votos_por_candidato[candidatos_coincidentes[0]] += 1
 
+        print("\n--- Resultados del recuento ---")
         for candidato, cantidad in votos_por_candidato.items():
             print(f"{candidato}: {cantidad} votos")
 
