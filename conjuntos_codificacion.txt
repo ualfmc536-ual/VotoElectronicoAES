@@ -1,4 +1,4 @@
-Conjunto de codificación del Candidato 1: 
-2 	3 	0 	1 	9 	5 	6 	
-Conjunto de codificación del Candidato 2: 
-8 	4 	12 	11 	7 	10 	
+Conjunto de codificaciÃ³n del Candidato 1: 
+10 	6 	5 	4 	9 	3 	0 	
+Conjunto de codificaciÃ³n del Candidato 2: 
+1 	2 	11 	7 	12 	8 	
