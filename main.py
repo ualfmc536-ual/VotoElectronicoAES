@@ -12,6 +12,7 @@ from Crypto.Random import get_random_bytes
 
 
 # Variables globales
+clave = null
 generador = Random()
 p = 13                  # Número primo para el módulo
 num_votantes = 0        # Número de votantes
@@ -75,6 +76,8 @@ def actualizar_censo(id_votante: int, index: int) -> None:
 
 
 def iniciar_urna():
+    global clave
+    clave = alg_skga.crear_clave()
     with open("urna.txt", "w") as archivo:
         for i in range(num_votantes):
             archivo.write(str(generador.randint(0, 100)%p) + " \t")
@@ -364,11 +367,11 @@ def decoder(texto, clave):
     # Quitamos el relleno y devolvemos el texto original
     return texto_padded[:-texto_padded[-1]]
 
-def guardar_clave_texto_cifrado(clave, texto, ruta):
+def guardar_clave_texto_cifrado(clave, ruta):
     
     with open(ruta, "a") as f:
         hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"{hora} | AES: {clave} | Texto Cifrado: {texto}\n")
+        f.write(f"{hora} | AES: {clave} \n")
     
 def guardar_ruta(ruta_claves):
     if ruta_claves is None:
@@ -415,8 +418,6 @@ class alg_skga:
         else:
             print("Error: El archivo no tiene una segunda línea.")
             return [] # O manejar el error como prefieras
-            
-        clave = crear_clave()
     
     # 2. Modificar los números
        for i in range(len(numeros)):
